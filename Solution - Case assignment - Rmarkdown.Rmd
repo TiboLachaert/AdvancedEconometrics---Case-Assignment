@@ -2,29 +2,69 @@
 title: "Solution Case Assignment"
 author: "Tibo Lachaert"
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Part 0: OLS estimation
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r packages, message=FALSE, warning=FALSE}
+source("OwnFunctions.R")
+library(tidyverse)
+library(readr)
+library(fastDummies)
+library(matlib)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r data}
+data <- read_delim("Data_Baltagi.csv", delim = ";", 
+                   escape_double = FALSE, trim_ws = TRUE, show_col_types = FALSE) %>% 
+  rename("lnC_it" = "ln C_it", 
+         "lnP_it" = "ln P_it", 
+         "lnPn_it" = "ln Pn_it", 
+         "lnY_it" = "ln Y_it") %>%
+  group_by(state) %>%
+  mutate(lnC_it_lag = lag(lnC_it, n = 1)) %>%
+  ungroup() %>%
+  na.omit()
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r OLS}
+df_OLS_y <- data %>%
+  select(lnC_it) %>%
+  as.matrix()
+
+df_OLS_X <- data %>%  
+  mutate(intercept = 1) %>%
+  select(intercept, lnC_it_lag, lnP_it, lnPn_it, lnY_it) %>%
+  as.matrix()
+
+OLS <- OLS_own(df_OLS_y, df_OLS_X)
+knitr::kable(OLS[2:5, ])
+```
+
+## Part 1: Fixed Effects (FE) estimation
+
+```{r FE}
+df_FE_y <- data %>% 
+  select(state, year, lnC_it) %>%
+  pivot_wider(names_from = state, values_from = lnC_it) %>%
+  select(-year) %>%
+  as.matrix()
+
+df_FE_X <- data %>% 
+  select(state, year, lnC_it_lag, lnP_it, lnPn_it, lnY_it) %>%
+  mutate(dummy_cols(data %>% select(year))) %>%
+  pivot_longer(cols = -c(state, year)) %>%
+  xtabs(data = ., value ~ year + state + name)
+
+FE <- FE_own(df_FE_y, df_FE_X)
+knitr::kable(FE[1:4, ])
+```
+
