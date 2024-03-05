@@ -52,33 +52,59 @@ show(FE[1:4, ])
 ## Simulating properties of the FE estimator ----
 
 ## Simulation methods for bias correction and inference ----
-burn_t <- 25
-rho_sim <- c(0, 0.5, 0.9)
-N_sim = c(10, 100)
-T_sim = c(4, 10, 20, 50)
 
-generate_MC <- function(rho, N, T){
-  yit <- matrix(data = 0, nrow = N, ncol = T)
+#Define parameter grid
+burn_t <- 25
+rho_par <- c(0, 0.5, 0.9)
+T_par = c(4, 10, 20, 50)
+N_par = c(10, 100)
+
+#Generate samples
+generate_sample <- function(rho, N, T){ #Should be implemented with vectors
+  yit <- matrix(data = 0, nrow = T+1, ncol = N)
   for (i in 1:N){
     y <- 0
       for (s in 1:burn_t){
         y <- rho*y + rnorm(1)
       }
+    yit[1, i] <- y
     for (t in 1:T){
       y <- rho*y + rnorm(1)
-      yit[i, t] <- y
+      yit[t+1, i] <- y
     }
   }
   return(yit)
 }
 
-for (rho in rho_sim) {
-  for (N in N_sim){
-    for (T in T_sim){
-      print(c(rho, N, T))
+#Perform Monte Carlo
+N_sim <- 10 #Number of simulations
+result_MC <- data.frame(rho = double(), T = integer(), N = integer(), 
+                        result_rho = double(), result_se = double())
+
+for (rho in rho_par) {
+  for (T in T_par) {
+     for (N in N_par) {
+       print(c(rho, T, N))
+       rho_sim  <- c()
+       se_sim   <- c()
+       for (i in 1:N_sim) {
+        df_MC   <- generate_MC(rho, N, T)
+        df_MC_y <- df_MC[-1, ]
+        df_MC_x <- array(df_MC[-(T+1), ], dim=c(T, N, 1))
+        
+        FE_MC   <- FE_own(df_MC_y, df_MC_x)
+        rho_sim <- c(rho_sim, FE_MC[1])
+        se_sim  <- c(se_sim, FE_MC[2])
+       }
+       result_MC <- rbind(result_MC, list(rho = rho, T = T, N = N, 
+                                          result_rho = mean(rho_sim), result_se = mean(se_sim)))
     }
   }
 }
+
+result_MC$asymptotic_assumption <- result_MC$N / result_MC$T^3 
+result_MC$nickel_bias           <- - (1+result_MC$rho)/result_MC$T
+result_MC$nickel_bias_corrected <- result_MC$rho + result_MC$nickel_bias
 
 ### Half-panel jackknife bias-corrected FE estimator ----
 

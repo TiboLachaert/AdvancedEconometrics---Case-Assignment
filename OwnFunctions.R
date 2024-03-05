@@ -38,9 +38,9 @@ OLS_own = function (y, x)
 ####################################################################
 FE_own = function (y, x) 
 {
-  N  <- ncol(y)
-  T  <- nrow(y)
-  K  <- ncol(x[1, , ])
+  T  <- dim(x)[1]
+  N  <- dim(x)[2]
+  K  <- dim(x)[3]
   df <- N*T-K
   
   ## Run FE
