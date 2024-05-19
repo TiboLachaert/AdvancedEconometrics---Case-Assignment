@@ -86,4 +86,29 @@ FE_own = function (y, x)
   return(out)
 }
 
+####################################################################
+#########       Generalized Method of Moments (GMM)       ##########
+####################################################################
+GMM_own = function (y, x, z) 
+{
+  T  <- dim(x)[1]
+  N  <- dim(x)[2]
+  K  <- dim(x)[3]
+  df <- N*T-K
+  
+  ## Run GMM
+
+  ## Save output
+  names(coefs) <- colnames(x[1, ,])
+  
+  coefs  <- round(coefs,3)
+  stdvs  <- round(stdvs,3)
+  tstats <- round(tstats,3)
+  pvals  <- round(pvals,3)
+  
+  out = rbind(coefs, stdvs, tstats, pvals)
+  out = t(out)
+  return(out)
+}
+
 

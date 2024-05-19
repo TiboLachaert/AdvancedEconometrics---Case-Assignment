@@ -14,17 +14,24 @@ data <- read_delim("Data_Baltagi.csv", delim = ";",
          "lnPn_it" = "ln Pn_it", 
          "lnY_it" = "ln Y_it") %>%
   group_by(state) %>%
+  mutate(intercept = 1) %>%
   mutate(lnC_it_lag = lag(lnC_it, n = 1)) %>%
-  ungroup() %>%
-  na.omit()
+  mutate(lnC_it_lag2 = lag(lnC_it, n = 2)) %>%
+  mutate(lnC_it_lag3 = lag(lnC_it, n = 3)) %>%
+  mutate(lnC_it_diff = c(NA, diff(lnC_it, lag = 1))) %>%
+  mutate(lnC_it_diff_lag = lag(lnC_it_diff, n = 1)) %>%
+  ungroup()
 
 ## Replicate OLS results ----
-df_OLS_y <- data %>%
+data_OLS <- data %>%
+  select(lnC_it, intercept, lnC_it_lag, lnP_it, lnPn_it, lnY_it) %>%
+  na.omit()
+
+df_OLS_y <- data_OLS %>%
   select(lnC_it) %>%
   as.matrix()
 
-df_OLS_X <- data %>%  
-  mutate(intercept = 1) %>%
+df_OLS_X <- data_OLS %>%  
   select(intercept, lnC_it_lag, lnP_it, lnPn_it, lnY_it) %>%
   as.matrix()
 
@@ -34,20 +41,24 @@ show(OLS[2:5, ])
 # Part 1: Fixed Effects (FE) estimation ----
 
 ## Replicate FE results ----
-df_FE_y <- data %>% 
+data_FE <- data %>%
+  select(state, year, lnC_it, lnC_it_lag, lnP_it, lnPn_it, lnY_it) %>%
+  na.omit()
+
+df_FE_y <- data_FE %>% 
   select(state, year, lnC_it) %>%
   pivot_wider(names_from = state, values_from = lnC_it) %>%
   select(-year) %>%
   as.matrix()
 
-df_FE_X <- data %>% 
+df_FE_X <- data_FE %>% 
   select(state, year, lnC_it_lag, lnP_it, lnPn_it, lnY_it) %>%
-  mutate(dummy_cols(data %>% select(year))) %>%
+  mutate(dummy_cols(data_FE %>% select(year))) %>%
   pivot_longer(cols = -c(state, year)) %>%
   xtabs(data = ., value ~ year + state + name)
 
 FE <- FE_own(df_FE_y, df_FE_X)
-show(FE[1:4, ])
+show(FE[1:4, ]) #Standard errors and t-stats wrong!
 
 ## Simulating properties of the FE estimator ----
 
@@ -88,7 +99,7 @@ for (rho in rho_par) {
        rho_sim  <- c()
        se_sim   <- c()
        for (i in 1:N_sim) {
-        df_MC   <- generate_MC(rho, N, T)
+        df_MC   <- generate_sample(rho, N, T)
         df_MC_y <- df_MC[-1, ]
         df_MC_x <- array(df_MC[-(T+1), ], dim=c(T, N, 1))
         
@@ -111,3 +122,101 @@ result_MC$nickel_bias_corrected <- result_MC$rho + result_MC$nickel_bias
 ### Bootstrap ----
 
 # Part 2: Generalized Method of Moments (GMM) estimation ----
+
+## One-step GMM ----
+data_GMM2 <- data %>%
+  select(state, year, intercept, lnC_it_diff, lnC_it_diff_lag, lnC_it_lag2) %>%
+  na.omit()
+
+df_GMM_y <- data_GMM2 %>% 
+  select(state, year, lnC_it_diff) %>%
+  pivot_wider(names_from = state, values_from = lnC_it_diff) %>%
+  select(-year) %>%
+  as.matrix()
+
+include_dummy    <- FALSE
+include_constant <- FALSE
+
+if(include_dummy){
+  if(include_constant){
+    df_GMM_X <- data_GMM2 %>% 
+      select(state, year, intercept, lnC_it_diff_lag) %>%
+      mutate(dummy_cols(data_GMM2 %>% select(year))) %>%
+      pivot_longer(cols = -c(state, year)) %>%
+      xtabs(data = ., value ~ year + state + name)
+  } else {
+    df_GMM_X <- data_GMM2 %>% 
+      select(state, year, lnC_it_diff_lag) %>%
+      mutate(dummy_cols(data_GMM2 %>% select(year))) %>%
+      pivot_longer(cols = -c(state, year)) %>%
+      xtabs(data = ., value ~ year + state + name)
+  }
+} else {
+  if(include_constant){
+    df_GMM_X <- data_GMM2 %>% 
+      select(state, year, intercept, lnC_it_diff_lag) %>%
+      pivot_longer(cols = -c(state, year)) %>%
+      xtabs(data = ., value ~ year + state + name)
+  } else {
+    df_GMM_X <- data_GMM2 %>% 
+      select(state, year, lnC_it_diff_lag) %>%
+      pivot_longer(cols = -c(state, year)) %>%
+      xtabs(data = ., value ~ year + state + name)
+  }
+}
+
+df_GMM_Z <- data_GMM2 %>% 
+  select(state, year, lnC_it_lag2) %>%
+  pivot_longer(cols = -c(state, year)) %>%
+  xtabs(data = ., value ~ year + state + name)
+
+## Two-step GMM ----
+data_GMM3 <- data %>%
+  select(state, year, intercept, lnC_it_diff, lnC_it_diff_lag, lnC_it_lag2, lnC_it_lag3) %>%
+  na.omit()
+
+df_GMM_y <- data_GMM3 %>% 
+  select(state, year, lnC_it_diff) %>%
+  pivot_wider(names_from = state, values_from = lnC_it_diff) %>%
+  select(-year) %>%
+  as.matrix()
+
+include_dummy    <- FALSE
+include_constant <- FALSE
+
+if(include_dummy){
+  if(include_constant){
+    df_GMM_X <- data_GMM3 %>% 
+      select(state, year, intercept, lnC_it_diff_lag) %>%
+      mutate(dummy_cols(data_GMM3 %>% select(year))) %>%
+      pivot_longer(cols = -c(state, year)) %>%
+      xtabs(data = ., value ~ year + state + name)
+  } else {
+    df_GMM_X <- data_GMM3 %>% 
+      select(state, year, lnC_it_diff_lag) %>%
+      mutate(dummy_cols(data_GMM3 %>% select(year))) %>%
+      pivot_longer(cols = -c(state, year)) %>%
+      xtabs(data = ., value ~ year + state + name)
+  }
+} else {
+  if(include_constant){
+    df_GMM_X <- data_GMM3 %>% 
+      select(state, year, intercept, lnC_it_diff_lag) %>%
+      pivot_longer(cols = -c(state, year)) %>%
+      xtabs(data = ., value ~ year + state + name)
+  } else {
+    df_GMM_X <- data_GMM3 %>% 
+      select(state, year, lnC_it_diff_lag) %>%
+      pivot_longer(cols = -c(state, year)) %>%
+      xtabs(data = ., value ~ year + state + name)
+  }
+}
+
+df_GMM_Z <- data_GMM3 %>% 
+  select(state, year, lnC_it_lag2, lnC_it_lag3) %>%
+  pivot_longer(cols = -c(state, year)) %>%
+  xtabs(data = ., value ~ year + state + name)
+
+
+
+
