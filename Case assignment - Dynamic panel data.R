@@ -88,9 +88,12 @@ generate_sample <- function(rho, N, T){ #Should be implemented with vectors
 }
 
 #Perform Monte Carlo
+#ese = estimated standard error
+#tse = true standard error
 N_sim <- 10 #Number of simulations
 result_MC <- data.frame(rho = double(), T = integer(), N = integer(), 
-                        result_rho = double(), result_se = double())
+                        result_rho = double(), result_ese = double(), 
+                        result_tse = double(), result_an = double())
 
 for (rho in rho_par) {
   for (T in T_par) {
@@ -108,7 +111,8 @@ for (rho in rho_par) {
         se_sim  <- c(se_sim, FE_MC[2])
        }
        result_MC <- rbind(result_MC, list(rho = rho, T = T, N = N, 
-                                          result_rho = mean(rho_sim), result_se = mean(se_sim)))
+                                          result_rho = mean(rho_sim), result_ese = mean(se_sim), 
+                                          result_tse = sd(rho_sim), result_an = 1/sqrt(T * (1 - rho^2))))
     }
   }
 }
