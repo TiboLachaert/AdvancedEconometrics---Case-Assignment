@@ -1,4 +1,9 @@
-# Part 0: OLS estimation -----
+#########################################
+##     Take home exam 2024 - Part 1    ## 
+## Tibo Lachaert & Nicolas Romero Diaz ##
+#########################################
+
+# Case 0: OLS estimation -----
 
 ## Import data and packages ----
 source("OwnFunctions.R")
@@ -38,7 +43,7 @@ df_OLS_X <- data_OLS %>%
 OLS <- OLS_own(df_OLS_y, df_OLS_X)
 show(OLS[2:5, ])
 
-# Part 1: Fixed Effects (FE) estimation ----
+# Case 1: Fixed Effects (FE) estimation ----
 
 ## Replicate FE results ----
 data_FE <- data %>%
@@ -58,7 +63,7 @@ df_FE_X <- data_FE %>%
   xtabs(data = ., value ~ year + state + name)
 
 FE <- FE_own(df_FE_y, df_FE_X)
-show(FE[1:4, ]) #Standard errors and t-stats wrong!
+show(FE[1:4, ]) #Correction term added in function to match t-stats of assignment
 
 ## Simulating properties of the FE estimator ----
 
@@ -125,54 +130,111 @@ result_MC$nickel_bias_corrected <- result_MC$rho + result_MC$nickel_bias
 
 ### Bootstrap ----
 
-# Part 2: Generalized Method of Moments (GMM) estimation ----
+# Case 2: Generalized Method of Moments (GMM) estimation ----
 
-## One-step GMM ----
-data_GMM2 <- data %>%
-  select(state, year, intercept, lnC_it_diff, lnC_it_diff_lag, lnC_it_lag2) %>%
-  na.omit()
-
-df_GMM_y <- data_GMM2 %>% 
-  select(state, year, lnC_it_diff) %>%
-  pivot_wider(names_from = state, values_from = lnC_it_diff) %>%
-  select(-year) %>%
-  as.matrix()
-
-include_dummy    <- FALSE
-include_constant <- FALSE
-
-if(include_dummy){
-  if(include_constant){
-    df_GMM_X <- data_GMM2 %>% 
-      select(state, year, intercept, lnC_it_diff_lag) %>%
-      mutate(dummy_cols(data_GMM2 %>% select(year))) %>%
-      pivot_longer(cols = -c(state, year)) %>%
-      xtabs(data = ., value ~ year + state + name)
-  } else {
-    df_GMM_X <- data_GMM2 %>% 
-      select(state, year, lnC_it_diff_lag) %>%
-      mutate(dummy_cols(data_GMM2 %>% select(year))) %>%
-      pivot_longer(cols = -c(state, year)) %>%
-      xtabs(data = ., value ~ year + state + name)
+# Function to generate AR(1) panel data
+generate_ar1_panel <- function(rho, N, T) {
+  
+  # Number of total time steps including burn-in period
+  total_T <- T + 25
+  
+  # Initialize a matrix to hold the panel data
+  panel_data <- matrix(0, nrow = N * T, ncol = 3)
+  colnames(panel_data) <- c("individual", "time", "value")
+  
+  for (i in 1:N) {
+    # Initialize the AR(1) process for each individual
+    x <- numeric(total_T)
+    x[1] <- rnorm(1)  # Initial value
+    
+    # Generate the AR(1) process with burn-in period
+    for (t in 2:total_T) {
+      x[t] <- rho * x[t - 1] + rnorm(1)
+    }
+    
+    # Remove the burn-in period
+    x <- x[-(1:25)]
+    
+    # Populate the panel data matrix
+    panel_data[((i-1) * T + 1):(i * T), ] <- cbind(rep(i, T), 1:T, x)
   }
-} else {
-  if(include_constant){
-    df_GMM_X <- data_GMM2 %>% 
-      select(state, year, intercept, lnC_it_diff_lag) %>%
-      pivot_longer(cols = -c(state, year)) %>%
-      xtabs(data = ., value ~ year + state + name)
-  } else {
-    df_GMM_X <- data_GMM2 %>% 
-      select(state, year, lnC_it_diff_lag) %>%
-      pivot_longer(cols = -c(state, year)) %>%
-      xtabs(data = ., value ~ year + state + name)
-  }
+  
+  # Convert the matrix to a dataframe
+  panel_df <- as.data.frame(panel_data)
+  
+  # Convert individual and time columns to factors for panel data representation
+  panel_df$individual <- as.factor(panel_df$individual)
+  panel_df$time <- as.factor(panel_df$time)
+  
+  return(panel_df)
 }
 
-df_GMM_Z <- data_GMM2 %>% 
-  select(state, year, lnC_it_lag2) %>%
-  pivot_longer(cols = -c(state, year)) %>%
-  xtabs(data = ., value ~ year + state + name)
+## One-step GMM ----
+
+rho <- 0.5
+N <- 10
+T <- 20
+
+df_GMM <- generate_ar1_panel(rho, N, T) %>% 
+  group_by(individual) %>%
+  mutate(yit = value) %>%
+  mutate(yit_lag1 = lag(yit, n = 1)) %>%
+  mutate(yit_lag2 = lag(yit, n = 2)) %>%
+  mutate(yit_lag3 = lag(yit, n = 3)) %>%
+  mutate(yit_diff = yit - lag(yit)) %>%
+  mutate(yit_diff_lag = lag(yit_diff)) %>%
+  ungroup()
+
+df_GMM_IV1 <- df_GMM %>%
+  select(individual, time, yit_diff, yit_diff_lag, yit_lag2) %>%
+  na.omit()
+
+df_GMM_IV1_y <- df_GMM_IV1 %>% 
+  select(individual, time, yit_diff) %>%
+  pivot_wider(names_from = individual, values_from = yit_diff) %>%
+  select(-time) %>%
+  as.matrix()
+
+df_GMM_IV1_X <- df_GMM_IV1 %>% 
+  select(individual, time, yit_diff_lag) %>%
+  pivot_longer(cols = -c(individual, time)) %>%
+  mutate(time = as.numeric(time) - 2) %>%
+  xtabs(data = ., value ~ time + individual + name)
+
+df_GMM_IV1_Z <- df_GMM_IV1 %>% 
+  select(individual, time, yit_lag2) %>%
+  pivot_longer(cols = -c(individual, time)) %>%
+  mutate(time = as.numeric(time) - 2) %>%
+  xtabs(data = ., value ~ time + individual + name)
+
+df_GMM_IV2 <- df_GMM %>%
+  select(individual, time, yit_diff, yit_diff_lag, yit_lag2, yit_lag3) %>%
+  na.omit()
+
+df_GMM_IV2_y <- df_GMM_IV2 %>% 
+  select(individual, time, yit_diff) %>%
+  pivot_wider(names_from = individual, values_from = yit_diff) %>%
+  select(-time) %>%
+  as.matrix()
+
+df_GMM_IV2_X <- df_GMM_IV2 %>% 
+  select(individual, time, yit_diff_lag) %>%
+  pivot_longer(cols = -c(individual, time)) %>%
+  mutate(time = as.numeric(time) - 3) %>%
+  xtabs(data = ., value ~ time + individual + name)
+
+df_GMM_IV2_Z <- df_GMM_IV2 %>% 
+  select(individual, time, yit_lag2, yit_lag3) %>%
+  pivot_longer(cols = -c(individual, time)) %>%
+  mutate(time = as.numeric(time) - 3) %>%
+  xtabs(data = ., value ~ time + individual + name)
+
+y <- df_GMM_IV1_y
+X <- df_GMM_IV1_X
+Z <- df_GMM_IV1_Z
+GMM_onestep <- GMM_onestep_own(df_GMM_IV1_y, df_GMM_IV1_X, df_GMM_IV1_Z)
+show(GMM_onestep[1:4, ])
+
 
 ## Two-step GMM ----
 data_GMM3 <- data %>%

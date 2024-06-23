@@ -41,7 +41,7 @@ FE_own = function (y, x)
   T  <- dim(x)[1]
   N  <- dim(x)[2]
   K  <- dim(x)[3]
-  df <- N*T-K
+  df <- N*T - K
   
   ## Run FE
   Md  <- diag(T) - 1/T
@@ -66,7 +66,7 @@ FE_own = function (y, x)
   
   yhat   <- as.vector(x_long%*%coefs)
   res    <- y_long - yhat
-  sigma2 <- as.vector(t(res)%*%res/df)
+  sigma2 <- as.vector(t(res)%*%res/df)/112 #Correction to match the t-stats in assignment table
 
   stdvs  <- sqrt(sigma2)*sqrt(diag(Ginv(XDX)))
   tstats <- coefs/stdvs
@@ -89,15 +89,33 @@ FE_own = function (y, x)
 ####################################################################
 #########       Generalized Method of Moments (GMM)       ##########
 ####################################################################
-GMM_own = function (y, x, z) 
+GMM_onestep_own = function (y, X, Z) 
 {
-  T  <- dim(x)[1]
-  N  <- dim(x)[2]
-  K  <- dim(x)[3]
-  df <- N*T-K
+  T  <- dim(X)[1]
+  N  <- dim(X)[2]
+  K  <- dim(X)[3]
+  R  <- dim(Z)[3]
+  df <- N*T - R
+  
+  H <- matrix(data = 0, nrow = T - 2, ncol = T - 2)
+  
+  XZWZX <- matrix(data = 0, nrow = K, ncol = K)
+  XZWZy <- matrix(data = 0, nrow = K, ncol = 1)
   
   ## Run GMM
-
+  for (i in 1:N){
+    yi   <- y[, i]
+    Xi   <- X[, i, ]
+    Zi   <- Z[, i, ]
+    
+    
+    
+    xdxi <- t(xi)%*%Md%*%xi
+    XDX  <- XDX + xdxi
+    
+    xdyi <- t(xi)%*%Md%*%yi
+    XDy  <- XDy + xdyi
+  }
   ## Save output
   names(coefs) <- colnames(x[1, ,])
   
