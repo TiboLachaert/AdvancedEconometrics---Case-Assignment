@@ -36,7 +36,7 @@ OLS_own = function (y, x)
 ####################################################################
 ##################       Fixed Effects (FE)       ##################
 ####################################################################
-FE_own = function (y, x) 
+FE_own = function (y, x, correction = FALSE) 
 {
   T  <- dim(x)[1]
   N  <- dim(x)[2]
@@ -66,7 +66,10 @@ FE_own = function (y, x)
   
   yhat   <- as.vector(x_long%*%coefs)
   res    <- y_long - yhat
-  sigma2 <- as.vector(t(res)%*%res/df)/112 #Correction to match the t-stats in assignment table
+  sigma2 <- as.vector(t(res)%*%res/df)
+  if(correction){
+    sigma2 <- sigma2/112 #Correction to match the t-stats in assignment table
+  }
 
   stdvs  <- sqrt(sigma2)*sqrt(diag(Ginv(XDX)))
   tstats <- coefs/stdvs
