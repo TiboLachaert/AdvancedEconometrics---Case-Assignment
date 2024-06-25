@@ -68,7 +68,7 @@ FE_own = function (y, x, correction = FALSE)
   res    <- y_long - yhat
   sigma2 <- as.vector(t(res)%*%res/df)
   if(correction){
-    sigma2 <- sigma2/112 #Correction to match the t-stats in assignment table
+    sigma2 <- sigma2/112 #Correction to match the t-stats in Baltagi example
   }
 
   stdvs  <- sqrt(sigma2)*sqrt(diag(Ginv(XDX)))

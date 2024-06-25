@@ -119,9 +119,10 @@ set.seed(11132)
 result_FE_MC <- data.frame(rho = double(), T = integer(), N = integer(), 
                         result_rho = double(), result_ese = double(), 
                         result_tse = double(), result_an = double(), 
-                        size = double())
+                        size_an = double(), size_ese = double())
 #ese = estimated standard error
 #tse = true standard error
+#an = analytical standard error
 
 for (rho in rho_par) {
   for (T in T_par) {
@@ -155,8 +156,9 @@ for (rho in rho_par) {
       }
       result_FE_MC <- rbind(result_FE_MC, list(rho = rho, T = T, N = N, 
                                          result_rho = mean(rho_sim), result_ese = mean(se_sim), 
-                                         result_tse = sd(rho_sim), result_an = 1/sqrt(T * (1 - rho^2)), 
-                                         size = sum(abs((rho_sim - rho)/se_sim) > 1.96) / N_sim))
+                                         result_tse = sd(rho_sim), result_an = 1/sqrt(T * N * (1 - rho^2)), 
+                                         size_an = sum(abs((rho_sim - rho)/(1/sqrt(T * N * (1 - rho^2)))) > 1.96) / N_sim,
+                                         size_ese = sum(abs((rho_sim - rho)/se_sim) > 1.96) / N_sim))
     }
   }
 }
