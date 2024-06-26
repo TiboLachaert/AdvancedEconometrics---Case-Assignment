@@ -147,7 +147,7 @@ block_bootstrap <- function(individual_col, df) {
 rho_values <- c(0, 0.5, 0.9)
 N_values <- c(10, 100)
 T_values <- c(4, 10, 20, 50)
-B_values <- 500 # No. of re-samples drawn
+B_values <- 2000 # No. of re-samples drawn
 
 # Set value of rho
 #rho = 0.8
@@ -204,8 +204,16 @@ for (rho in rho_values) {
 }
 
 
+#write.csv(result_MC, "D:/users/nicolas.romero/OneDrive - Vlerick Business School/UGent/23-24/econometrics_2/take_home_exam/jackknife_bias_correction.csv", row.names=FALSE)
 
+result_MC <- read_delim("jackknife_bias_correction.csv", delim = ",",
+                        escape_double = FALSE, trim_ws = TRUE, show_col_types = FALSE)
 
+# Print mean of the BOOTSTRAPPED standard error
+print(mean(result_MC$result_se))
+
+# Print mean of the TRUE standard
+print(mean(result_MC$result_se_FE))
 
 
 
